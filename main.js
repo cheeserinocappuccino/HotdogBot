@@ -32,7 +32,7 @@ dbContext.connect(function (err) {
 
 
 // the command prefix for our bot. such as /mycommand or $mycommand
-const prefix = '$';
+const prefix = '!';
 
 // when the client emmited a event called 'ready', do something
 client.once('ready', () => {
@@ -48,11 +48,35 @@ client.on('messageCreate', (message) => {
 
     // pre process commands before processing;
     const input = message.content.slice(prefix.length).split(/ +/);
-    const command = input.shift().toLowerCase();
+    const command = input[0].toLowerCase();
     console.log("Received command \n raw =" + message.content + " \n input =" + input + "\n pure =" + command)
 
     if (command === 'ping') {
         message.channel.send('pong');
+    }
+
+    if(command === 'prefix'){
+        if(input[1].length > 20)
+        {
+            message.channel.send("字數過長");
+            return;
+        }
+        else if(message.member.voice.channelId == undefined)
+        {
+            message.channel.send("請進入語音頻道再做此設定")
+            return;
+        }
+            
+        console.log("Adding emoji to database");
+        let addChannelSettingsql = "CALL SaveChannelSettings(" + message.member.voice.channelId.toString() +
+                                        ", " + message.member.guild.id.toString()+ ", '"
+                                        + input[1] + "');";
+
+        dbContext.query(addChannelSettingsql, function (err, rows, result) {
+                    if (err) throw err;
+                });
+
+        message.channel.send("語音頻道 " + message.member.voice.channel.name +" 的前綴已經設定為: " + input[1]);
     }
 });
 
@@ -116,7 +140,7 @@ client.on('voiceStateUpdate', (oldState, newState) => {
             // 如果有找到emoji的話
             if (emoji != undefined) {
 
-                client.channels.cache.get('638705738314809384').send(emoji + " debug");
+                //client.channels.cache.get('638705738314809384').send(emoji + " debug");
 
                 // 儲存原本的Nickname
                 const storeOriginNamesql = "CALL SaveOriginName(" + newState.member.id.toString() +
