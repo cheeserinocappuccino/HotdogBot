@@ -55,28 +55,26 @@ client.on('messageCreate', (message) => {
         message.channel.send('pong');
     }
 
-    if(command === 'prefix'){
-        if(input[1].length > 20)
-        {
+    if (command === 'prefix') {
+        if (input[1].length > 20) {
             message.channel.send("字數過長");
             return;
         }
-        else if(message.member.voice.channelId == undefined)
-        {
+        else if (message.member.voice.channelId == undefined) {
             message.channel.send("請進入語音頻道再做此設定")
             return;
         }
-            
+
         console.log("Adding emoji to database");
         let addChannelSettingsql = "CALL SaveChannelSettings(" + message.member.voice.channelId.toString() +
-                                        ", " + message.member.guild.id.toString()+ ", '"
-                                        + input[1] + "');";
+            ", " + message.member.guild.id.toString() + ", '"
+            + input[1] + "');";
 
         dbContext.query(addChannelSettingsql, function (err, rows, result) {
-                    if (err) throw err;
-                });
+            if (err) throw err;
+        });
 
-        message.channel.send("語音頻道 " + message.member.voice.channel.name +" 的前綴已經設定為: " + input[1]);
+        message.channel.send("語音頻道 " + message.member.voice.channel.name + " 的前綴已經設定為: " + input[1]);
     }
 });
 
@@ -84,94 +82,109 @@ client.on('messageCreate', (message) => {
 // needs GUILD_VOICE_STATES option to work when initializing Discord.Client
 client.on('voiceStateUpdate', (oldState, newState) => {
     // 設定只在有進出頻道時才啟動，否則return不做事
-    if(oldState.channelId == newState.channelId)
+    if (oldState.channelId == newState.channelId)
         return;
 
-    // 退出語音時
-    if (newState.channelId == undefined) {
-        const restoreNicknamesql = "SELECT usernickname FROM channel_username_store WHERE user_id = " +
-            newState.member.id.toString();
+    // 改nickname之前，先避免guildMemberUpdate聽到這次事件
+    fc_disableChangNicknameListener = true;
 
+    // 用於存取DB內的名子
+    var originName;
+    
+
+    // 初次進入任一語音頻道時
+    if (oldState.channelId == undefined && newState.channelId != undefined) {
+        // 儲存原本的Nickname
+        const storeOriginNamesql = "CALL SaveOriginName(" + newState.member.id.toString() +
+            ", " + newState.guild.id.toString() + ", '"
+            + newState.member.nickname.toString() + "');";
+
+        dbContext.query(storeOriginNamesql, function (err, rows, result) {
+            if (err) throw err;
+            console.log("Storeing current name")
+        });
+    }
+
+    // 任何更換頻道的事情，剛開始的瞬間皆從DB拿回本名
+    const restoreNicknamesql = "SELECT usernickname FROM channel_username_store WHERE user_id = " +
+        newState.member.id.toString();
+
+    dbContext.connect(function (err) {
+        
+        dbContext.query(restoreNicknamesql, function (err, rows, result) {
+            if (err) throw err;
+            try {
+                originName = rows[0]['usernickname'];
+            } catch {
+                console.log("Can't find user origin nickname");
+                //return;
+            }
+
+            if (originName != undefined)
+                newState.member.setNickname(originName, "backtonormal").catch(e => console.log("can't change owner"));
+
+            console.log("Restored nickname for " + originName);
+        });
+    });
+
+
+
+
+    //若非退出語音頻道(也就是單純切換), 額外做下面的事情
+    if (newState.channelId != undefined) {
 
 
         dbContext.connect(function (err) {
-            let originName;
-            dbContext.query(restoreNicknamesql, function (err, rows, result) {
+
+            const sql = "SELECT * FROM channel_setting WHERE channel_id = " + newState.channelId +
+                "&& guild_id =" + newState.guild;
+
+            // execute the query
+            let emoji;
+            dbContext.query(sql, function (err, rows, result) {
                 if (err) throw err;
                 try {
-                    originName = rows[0]['usernickname'];
+                    emoji = rows[0]['specialemoji'];
                 } catch {
-                    console.log("Can't find user origin nickname");
+                    // 如果沒有找到emoji
+                    console.log("Some one joined voice channel: " + newState.channel.name +
+                        "  ,but no channel setting found for this one");
                     return;
                 }
 
-                if (originName != undefined)
-                    newState.member.setNickname(originName, "backtonormal").catch(e => console.log("can't change owner"));
-                console.log("Restored nickname for " + originName);
+
+
+
+                // 如果有找到emoji的話
+                if (emoji != undefined) {
+
+                    //client.channels.cache.get('638705738314809384').send(emoji + " debug");
+
+
+                    console.log("selecting emoji");
+                    
+                    let newName = emoji + "" + originName;
+                    
+                    
+
+                    // 改nickname
+                    setTimeout(function () {
+                        newState.member.setNickname(newName, "enter sausage").catch(e => console.log("can't change owner"));
+                    }, 5)
+
+                    // 1秒後把guildMemberUpdate的listening改回來
+
+                }
+
             });
-        });
 
-        return; // 這行要記得加不然會繼續往下跑哦
+
+        })
+
     }
-
-
-    //若非退出語音(也就是加入語音), 做下面的事情
-    dbContext.connect(function (err) {
-
-        const sql = "SELECT * FROM channel_setting WHERE channel_id = " + newState.channelId +
-            "&& guild_id =" + newState.guild;
-
-        // execute the query
-        let emoji;
-        dbContext.query(sql, function (err, rows, result) {
-            if (err) throw err;
-            try {
-                emoji = rows[0]['specialemoji'];
-            } catch {
-                // 如果沒有找到emoji
-                console.log("Some one joined voice channel: " + newState.channel.name +
-                    "  ,but no channel setting found for this one");
-                return;
-            }
-
-
-            
-
-            // 如果有找到emoji的話
-            if (emoji != undefined) {
-
-                //client.channels.cache.get('638705738314809384').send(emoji + " debug");
-
-                // 儲存原本的Nickname
-                const storeOriginNamesql = "CALL SaveOriginName(" + newState.member.id.toString() +
-                    ", " + newState.guild.id.toString() + ", '"
-                    + newState.member.nickname.toString() + "');";
-
-
-
-                dbContext.query(storeOriginNamesql, function (err, rows, result) {
-                    if (err) throw err;
-
-                });
-                console.log("selecting emoji");
-                let newName = emoji + "" + newState.member.nickname;
-
-                // 改nickname之前，先避免guildMemberUpdate聽到這次事件
-                fc_disableChangNicknameListener = true;
-                // 改nickname
-                newState.member.setNickname(newName, "enter sausage").catch(e => console.log("can't change owner"));
-                // 1秒後把guildMemberUpdate的listening改回來
-                setTimeout(function(){
-                    fc_disableChangNicknameListener = false;
-                }, 1000)
-            }
-
-        });
-        
-
-    })
-    
-
+    setTimeout(function () {
+        fc_disableChangNicknameListener = false;
+    }, 1000)
 
 });
 
@@ -182,14 +195,14 @@ client.on('voiceStateUpdate', (oldState, newState) => {
 client.on('guildMemberUpdate', (oldMember, newMember) => {
     // voiceStateUpdate use this do temporary disable nickname storage
     // other wise guildMemberUpdate will store the modified nickname imediately;
-    if(fc_disableChangNicknameListener == true)
+    if (fc_disableChangNicknameListener == true)
         return;
 
 
     console.log("detect manual guildmemberUpdate");
 
     // Do shit when any user changed their nickname
-    if (newMember.nickname != oldMember.nickname && newMember.voice.channelId != undefined) {
+    if (newMember.nickname != oldMember.nickname /*&& newMember.voice.channelId != undefined*/) {
 
         console.log("User: " + oldMember.nickname + " Changed their nickname to: "
             + newMember.nickname + " , initialize new nickname db storing");
