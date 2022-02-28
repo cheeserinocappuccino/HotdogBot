@@ -184,7 +184,7 @@ client.on('voiceStateUpdate', (oldState, newState) => {
     }
     setTimeout(function () {
         fc_disableChangNicknameListener = false;
-    }, 1000)
+    }, 600)
 
 });
 
