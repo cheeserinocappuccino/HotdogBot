@@ -76,6 +76,12 @@ client.on('messageCreate', (message) => {
 
         message.channel.send("語音頻道 " + message.member.voice.channel.name + " 的前綴已經設定為: " + input[1]);
     }
+
+    if(command === '俎達')
+    {
+        message.channel.send('');
+    }
+    return;
 });
 
 // Listen to member join/leaving voice channel
@@ -84,6 +90,15 @@ client.on('voiceStateUpdate', (oldState, newState) => {
     // 設定只在有進出頻道時才啟動，否則return不做事
     if (oldState.channelId == newState.channelId)
         return;
+    
+    if( newState.member.id == newState.guild.ownerId)
+    {
+        console.log("owner action, aborting");
+        return;
+
+    }
+        
+        
 
     // 改nickname之前，先避免guildMemberUpdate聽到這次事件
     fc_disableChangNicknameListener = true;
@@ -184,8 +199,8 @@ client.on('voiceStateUpdate', (oldState, newState) => {
     }
     setTimeout(function () {
         fc_disableChangNicknameListener = false;
-    }, 600)
-
+    }, 1000)
+    return;
 });
 
 
@@ -217,6 +232,7 @@ client.on('guildMemberUpdate', (oldMember, newMember) => {
 
         });
     }
+    return;
 })
 
 // Fire when bot joined a Guild
@@ -234,7 +250,7 @@ client.on('guildCreate', guild => {
             console.log("Bot joined a server");
         });
     });
-
+    return;
 });
 
 
