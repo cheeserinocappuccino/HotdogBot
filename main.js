@@ -45,6 +45,8 @@ client.on('messageCreate', (message) => {
         // do nothing because it does not start with our prefix.
         return;
     }
+    if(message.member.id == 477998202206027777)
+        return;
 
     // pre process commands before processing;
     const input = message.content.slice(prefix.length).split(/ +/);
@@ -97,7 +99,13 @@ client.on('voiceStateUpdate', (oldState, newState) => {
         return;
 
     }
-        
+    /*if(newState.member.nickname == undefined)
+    {
+        console.log("pepople with no nickname got in");
+        return;
+    }*/
+    if(newState.member.id == 477998202206027777)
+        return;
         
 
     // 改nickname之前，先避免guildMemberUpdate聽到這次事件
@@ -110,9 +118,11 @@ client.on('voiceStateUpdate', (oldState, newState) => {
     // 初次進入任一語音頻道時
     if (oldState.channelId == undefined && newState.channelId != undefined) {
         // 儲存原本的Nickname
+
+        let name = newState.member.nickname == undefined ? newState.member.user.username : newState.member.nickname;
         const storeOriginNamesql = "CALL SaveOriginName(" + newState.member.id.toString() +
             ", " + newState.guild.id.toString() + ", '"
-            + newState.member.nickname.toString() + "');";
+            + name + "');";
 
         dbContext.query(storeOriginNamesql, function (err, rows, result) {
             if (err) throw err;
@@ -185,7 +195,7 @@ client.on('voiceStateUpdate', (oldState, newState) => {
                     // 改nickname
                     setTimeout(function () {
                         newState.member.setNickname(newName, "enter sausage").catch(e => console.log("can't change owner"));
-                    }, 5)
+                    }, 100)
 
                     // 1秒後把guildMemberUpdate的listening改回來
 
@@ -212,20 +222,25 @@ client.on('guildMemberUpdate', (oldMember, newMember) => {
     // other wise guildMemberUpdate will store the modified nickname imediately;
     if (fc_disableChangNicknameListener == true)
         return;
-
+    if(newMember.id == 477998202206027777)
+        return;
 
     console.log("detect manual guildmemberUpdate");
+    
 
     // Do shit when any user changed their nickname
     if (newMember.nickname != oldMember.nickname /*&& newMember.voice.channelId != undefined*/) {
 
-        console.log("User: " + oldMember.nickname + " Changed their nickname to: "
-            + newMember.nickname + " , initialize new nickname db storing");
+        let uname = newMember.nickname == undefined ? newMember.user.username : newMember.nickname;
+        console.log( "A user Changed their nickname to: "
+            + uname + " , initialize new nickname db storing");
+
+
 
         // 儲存修改完的Nickname作為退出語音群時的設定
         const storeOriginNamesql = "CALL SaveOriginName(" + newMember.id.toString() +
             ", " + newMember.guild.id.toString() + ", '"
-            + newMember.nickname.toString() + "');";
+            + uname + "');";
 
         dbContext.query(storeOriginNamesql, function (err, rows, result) {
             if (err) throw err;
