@@ -45,7 +45,7 @@ client.on('messageCreate', (message) => {
         // do nothing because it does not start with our prefix.
         return;
     }
-    if(message.member.id == 477998202206027777)
+    if (message.member.id == 477998202206027777)
         return;
 
     // pre process commands before processing;
@@ -79,10 +79,69 @@ client.on('messageCreate', (message) => {
         message.channel.send("語音頻道 " + message.member.voice.channel.name + " 的前綴已經設定為: " + input[1]);
     }
 
-    if(command === '俎達')
-    {
-        message.channel.send('');
+    if (command === '俎達') {
+        //message.channel.send('');
     }
+
+    // 睡前關伺服器記得shutdown把名子改回去
+    if (command === 'shutdown' && message.author == 295798903171710976) {
+        // 改nickname之前，先避免guildMemberUpdate聽到這次事件
+        fc_disableChangNicknameListener = true;
+
+        // 抓出所有在此群組的人
+        const shutdownSql = "SELECT user_id,usernickname FROM channel_username_store WHERE guild_id = "
+            + message.member.guild.id;
+
+        // alluserArr存放資料庫撈到的所有人
+        let allusersArr;
+        dbContext.connect(function (err) {
+
+            dbContext.query(shutdownSql, function (err, rows, result) {
+                if (err) throw err;
+                allusersArr = rows;
+
+                // 在console顯示所有撈到的人
+                for (let i = 0; i < allusersArr.length; i++) {
+                    console.log(allusersArr[i]['usernickname'] + " <<userName" + allusersArr[i]['user_id'] + " << userID")
+                }
+
+                // 對每個alluserArr的user做事情
+                for(let j = 0; j < allusersArr.length; j++)
+                {
+                    // 用fetch功能拿單一user的object，此方法回傳promise
+                    let usernowPromise = message.guild.members.fetch(allusersArr[j]['user_id']);
+                    // 預先備好db內的username
+                    let memberdbname = allusersArr[j]['usernickname'];
+                    
+                        // 用eachmember存取promise內包含的Guildmember物件
+                        usernowPromise.then(function(eachmember){
+                            
+                            // 先確認user還有沒有在語音群內
+                            if(eachmember.voice.channelId == undefined)
+                                return;
+                            
+                            // 有在語音群內的話，把它名子改回db內存的名子
+                            eachmember.setNickname(memberdbname, "due to shutdown")
+                                            .catch(e => console.log("shutdown user " + userdbname + " failed"));
+
+                        })
+
+                    
+                }
+
+                
+
+            });
+        });
+        
+        // 5秒後把guildMemberUpdate的listening改回來
+        setTimeout(function () {
+            fc_disableChangNicknameListener = false;
+        }, 5000)
+        message.channel.send("熱狗機器人休眠完成");
+        return;
+    };
+
     return;
 });
 
@@ -92,9 +151,8 @@ client.on('voiceStateUpdate', (oldState, newState) => {
     // 設定只在有進出頻道時才啟動，否則return不做事
     if (oldState.channelId == newState.channelId)
         return;
-    
-    if( newState.member.id == newState.guild.ownerId)
-    {
+
+    if (newState.member.id == newState.guild.ownerId) {
         console.log("owner action, aborting");
         return;
 
@@ -104,16 +162,16 @@ client.on('voiceStateUpdate', (oldState, newState) => {
         console.log("pepople with no nickname got in");
         return;
     }*/
-    if(newState.member.id == 477998202206027777)
+    if (newState.member.id == 477998202206027777)
         return;
-        
+
 
     // 改nickname之前，先避免guildMemberUpdate聽到這次事件
     fc_disableChangNicknameListener = true;
 
     // 用於存取DB內的名子
     var originName;
-    
+
 
     // 初次進入任一語音頻道時
     if (oldState.channelId == undefined && newState.channelId != undefined) {
@@ -135,7 +193,7 @@ client.on('voiceStateUpdate', (oldState, newState) => {
         newState.member.id.toString();
 
     dbContext.connect(function (err) {
-        
+
         dbContext.query(restoreNicknamesql, function (err, rows, result) {
             if (err) throw err;
             try {
@@ -187,17 +245,17 @@ client.on('voiceStateUpdate', (oldState, newState) => {
 
 
                     console.log("selecting emoji");
-                    
+
                     let newName = emoji + "" + originName;
-                    
-                    
+
+
 
                     // 改nickname
                     setTimeout(function () {
                         newState.member.setNickname(newName, "enter sausage").catch(e => console.log("can't change owner"));
                     }, 100)
 
-                    // 1秒後把guildMemberUpdate的listening改回來
+                    
 
                 }
 
@@ -207,6 +265,7 @@ client.on('voiceStateUpdate', (oldState, newState) => {
         })
 
     }
+    // 1秒後把guildMemberUpdate的listening改回來
     setTimeout(function () {
         fc_disableChangNicknameListener = false;
     }, 1000)
@@ -222,17 +281,17 @@ client.on('guildMemberUpdate', (oldMember, newMember) => {
     // other wise guildMemberUpdate will store the modified nickname imediately;
     if (fc_disableChangNicknameListener == true)
         return;
-    if(newMember.id == 477998202206027777)
+    if (newMember.id == 477998202206027777)
         return;
 
     console.log("detect manual guildmemberUpdate");
-    
+
 
     // Do shit when any user changed their nickname
     if (newMember.nickname != oldMember.nickname /*&& newMember.voice.channelId != undefined*/) {
 
         let uname = newMember.nickname == undefined ? newMember.user.username : newMember.nickname;
-        console.log( "A user Changed their nickname to: "
+        console.log("A user Changed their nickname to: "
             + uname + " , initialize new nickname db storing");
 
 
