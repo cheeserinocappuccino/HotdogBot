@@ -7,9 +7,6 @@ const fs = require('fs');
 const client = new Discord.Client({ intents: ["GUILDS", "GUILD_MESSAGES", "GUILD_PRESENCES", "GUILD_VOICE_STATES", "GUILD_MEMBERS"] });
 
 // (start) To get commands in other files
-
-// create a object called client.myCommands to store external commands object, it is type of Discord.Collection
-// Discord.Collection is basically a extention of JS Map object;
 client['myCommands'] = new Discord.Collection();
 
 const commandsFile = fs.readdirSync('./commands/').filter(f => f.endsWith('.js'));
@@ -26,17 +23,6 @@ console.log('loaded ' + commandsFile.length + ' command files');
 
 // Used for disabling certain listener;
 var fc_disableChangNicknameListener = false;
-
-// write start server audit
-let timenow = new Date().toISOString().slice(0, 19).replace("T", " ");
-let sql = "INSERT INTO actionaudit VALUES(default,'"
-    + timenow + "',1, NULL, 'client')";
-db.query(sql, function (err, result) {
-
-    if (err) throw err;
-    console.log("[server up] audit is inserted");
-});
-//db.end();
 
 // the command prefix for our bot. such as /mycommand or $mycommand
 const prefix = '!';
@@ -60,7 +46,7 @@ client.on('messageCreate', (message) => {
     const input = message.content.slice(prefix.length).split(/ +/);
     // command is the first text user type in channel that might trigger action, such as !ping, !prefix, !shudown
     const command = input[0].toLowerCase();
-    //console.log("Received command \n raw =" + message.content + " \n input =" + input + "\n pure =" + command)
+    
 
     // check if the user typed command exist
     const commandObject = client.myCommands.get(command);
@@ -70,68 +56,6 @@ client.on('messageCreate', (message) => {
     // execute the command by calling methods in objects
     client.myCommands.get(command).execute(message, input);
   
-
-   
-
-   /*  /* // 睡前關伺服器記得shutdown把名子改回去
-    if (command === 'shutdown' && message.author == 295798903171710976) {
-        // 改nickname之前，先避免guildMemberUpdate聽到這次事件
-        fc_disableChangNicknameListener = true;
-
-        // 抓出所有在此群組的人
-        const shutdownSql = "SELECT user_id,usernickname FROM channel_username_store WHERE guild_id = "
-            + message.member.guild.id;
-
-        // alluserArr存放資料庫撈到的所有人
-        let allusersArr;
-        dbContext.connect(function (err) {
-
-            dbContext.query(shutdownSql, function (err, rows, result) {
-                if (err) throw err;
-                allusersArr = rows;
-
-                // 在console顯示所有撈到的人
-                for (let i = 0; i < allusersArr.length; i++) {
-                    console.log(allusersArr[i]['usernickname'] + " <<userName" + allusersArr[i]['user_id'] + " << userID")
-                }
-
-                // 對每個alluserArr的user做事情
-                for(let j = 0; j < allusersArr.length; j++)
-                {
-                    // 用fetch功能拿單一user的object，此方法回傳promise
-                    let usernowPromise = message.guild.members.fetch(allusersArr[j]['user_id']);
-                    // 預先備好db內的username
-                    let memberdbname = allusersArr[j]['usernickname'];
-                    
-                        // 用eachmember存取promise內包含的Guildmember物件
-                        usernowPromise.then(function(eachmember){
-                            
-                            // 先確認user還有沒有在語音群內
-                            if(eachmember.voice.channelId == undefined)
-                                return;
-                            
-                            // 有在語音群內的話，把它名子改回db內存的名子
-                            eachmember.setNickname(memberdbname, "due to shutdown")
-                                            .catch(e => console.log("shutdown user " + userdbname + " failed"));
-
-                        })
-
-                    
-                }
-
-                
-
-            });
-        }); 
-        
-        // 5秒後把guildMemberUpdate的listening改回來
-        setTimeout(function () {
-            fc_disableChangNicknameListener = false;
-        }, 5000)
-        message.channel.send("熱狗機器人休眠完成");
-        return;
-    };
-    */
     return;
 }); 
 
@@ -265,9 +189,9 @@ client.on('voiceStateUpdate', (oldState, newState) => {
 
 
 
-// Fire whenever a guild member changes
+/* // Fire whenever a guild member changes
 client.on('guildMemberUpdate', (oldMember, newMember) => {
-    // voiceStateUpdate use this do temporary disable nickname storage
+    // voiceStateUpdate use this to temporary disable nickname storage
     // other wise guildMemberUpdate will store the modified nickname imediately;
     if (fc_disableChangNicknameListener == true)
         return;
@@ -278,7 +202,7 @@ client.on('guildMemberUpdate', (oldMember, newMember) => {
 
 
     // Do shit when any user changed their nickname
-    if (newMember.nickname != oldMember.nickname /*&& newMember.voice.channelId != undefined*/) {
+    if (newMember.nickname != oldMember.nickname) {
 
         let uname = newMember.nickname == undefined ? newMember.user.username : newMember.nickname;
         console.log("A user Changed their nickname to: "
@@ -297,7 +221,7 @@ client.on('guildMemberUpdate', (oldMember, newMember) => {
         });
     }
     return;
-})
+}) */
 
 // Fire when bot joined a Guild
 client.on('guildCreate', guild => {
