@@ -53,8 +53,15 @@ client.on('messageCreate', (message) => {
     if(commandObject == undefined)
         return;
 
+    // tasksToSuspend是執行特定任務時需要暫時被關閉的功能
+    const tasksToSuspend = {
+        "GuildMemberUpdate":GuildMemberUpdates
+    }
+    const args = [input, tasksToSuspend]
     // execute the command by calling methods in objects
-    client.myCommands.get(command).execute(message, input);
+    // execute(message, args, db)
+    // args[0] = input[] | args[1] = tasksToSuspend[]
+    client.myCommands.get(command).execute(message, args, db);
   
     return;
 }); 
@@ -96,7 +103,7 @@ client.on('voiceStateUpdate', (oldState, newState) => {
             ", " + newState.guild.id.toString() + ", '"
             + name + "');";
 
-        dbContext.query(storeOriginNamesql, function (err, rows, result) {
+        db.query(storeOriginNamesql, function (err, rows, result) {
             if (err) throw err;
             console.log("Storeing current name")
         });
@@ -106,9 +113,9 @@ client.on('voiceStateUpdate', (oldState, newState) => {
     const restoreNicknamesql = "SELECT usernickname FROM channel_username_store WHERE user_id = " +
         newState.member.id.toString();
 
-    dbContext.connect(function (err) {
+    db.connect(function (err) {
 
-        dbContext.query(restoreNicknamesql, function (err, rows, result) {
+        db.query(restoreNicknamesql, function (err, rows, result) {
             if (err) throw err;
             try {
                 originName = rows[0]['usernickname'];
@@ -131,14 +138,14 @@ client.on('voiceStateUpdate', (oldState, newState) => {
     if (newState.channelId != undefined) {
 
 
-        dbContext.connect(function (err) {
+        db.connect(function (err) {
 
             const sql = "SELECT * FROM channel_setting WHERE channel_id = " + newState.channelId +
                 "&& guild_id =" + newState.guild;
 
             // execute the query
             let emoji;
-            dbContext.query(sql, function (err, rows, result) {
+            db.query(sql, function (err, rows, result) {
                 if (err) throw err;
                 try {
                     emoji = rows[0]['specialemoji'];
@@ -189,8 +196,34 @@ client.on('voiceStateUpdate', (oldState, newState) => {
 
 
 
-/* // Fire whenever a guild member changes
+ // Fire whenever a guild member changes
 client.on('guildMemberUpdate', (oldMember, newMember) => {
+   GuildMemberUpdates(oldMember, newMember)
+    return;
+}) 
+
+// Fire when bot joined a Guild
+client.on('guildCreate', guild => {
+
+    db.connect(function (err) {
+        // create a query to insert a record to audit table and set time = now, type = 3(joinedguild)
+        let timenow = new Date().toISOString().slice(0, 19).replace("T", " ");
+        let sql = "INSERT INTO actionaudit VALUES(default,'"
+            + timenow + "',1,'Bot Joined Guild: " + guild.name + " id = " + guild.id + " ' , 'client');";
+
+        // execute the query
+        db.query(sql, function (err, result) {
+            if (err) throw err;
+            console.log("Bot joined a server");
+        });
+    });
+    return;
+});
+
+
+// Functions --------------------------------------------------------------
+function GuildMemberUpdates(oldMember, newMember)
+{
     // voiceStateUpdate use this to temporary disable nickname storage
     // other wise guildMemberUpdate will store the modified nickname imediately;
     if (fc_disableChangNicknameListener == true)
@@ -215,31 +248,12 @@ client.on('guildMemberUpdate', (oldMember, newMember) => {
             ", " + newMember.guild.id.toString() + ", '"
             + uname + "');";
 
-        dbContext.query(storeOriginNamesql, function (err, rows, result) {
+        db.query(storeOriginNamesql, function (err, rows, result) {
             if (err) throw err;
             return;
         });
     }
-    return;
-}) */
-
-// Fire when bot joined a Guild
-client.on('guildCreate', guild => {
-
-    dbContext.connect(function (err) {
-        // create a query to insert a record to audit table and set time = now, type = 3(joinedguild)
-        let timenow = new Date().toISOString().slice(0, 19).replace("T", " ");
-        let sql = "INSERT INTO actionaudit VALUES(default,'"
-            + timenow + "',1,'Bot Joined Guild: " + guild.name + " id = " + guild.id + " ' , 'client');";
-
-        // execute the query
-        dbContext.query(sql, function (err, result) {
-            if (err) throw err;
-            console.log("Bot joined a server");
-        });
-    });
-    return;
-});
+}
 
 
 // login, keep this at the bottom of main()

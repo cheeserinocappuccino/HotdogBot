@@ -1,7 +1,7 @@
 module.exports = {
     "name": "prefix",
     'description': 'A command to set channel\'s prefix emoji or text',
-    execute(message, args, dbContext){
+    execute(message, args, db){
         if (args[1].length > 20) {
             message.channel.send("字數過長");
             return;
@@ -18,7 +18,7 @@ module.exports = {
         let sql = `CALL SaveChannelSettings(${message.member.voice.channelId.toString()},
                                                 ${message.member.guild.id.toString()},
                                                 '${args[1]}')`;
-        dbContext.query(sql, function (err, rows, result) {
+        db.query(sql, function (err, rows, result) {
             if (err) throw err;
         });
 

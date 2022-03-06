@@ -1,14 +1,3 @@
-function GetDbConnection_p() {
-    let connection;
-    return new Promise((resolve, reject) => {
-        let db = require('../db.js');
-        if(db == undefined)
-            reject('db connect failed');
-
-        resolve(db);
-        
-    })
-}
 
 function GetAdmin_p(dbConnection, message) {
 
@@ -23,7 +12,7 @@ function GetAdmin_p(dbConnection, message) {
             else if (rows[0][0]  == undefined)
                 return reject('not a admin');
             else
-                return resolve(dbConnection);
+                return resolve();
 
         });
 
@@ -44,7 +33,7 @@ function GetMembersNicknameInDb_p(dbConnection, message) {
                 map.set(row['user_id'], row['usernickname']);
             }
 
-            return resolve(map, dbConnection);
+            return resolve(map);
         });
 
     });
@@ -54,11 +43,14 @@ function GetMembersNicknameInDb_p(dbConnection, message) {
 module.exports = {
     "name": "shutdown",
     "description": "A command for admin to shutdown bot, clean all stats apply to other user.",
-    execute(message, args) {
-        GetDbConnection_p() // 先連線
-            .then((dbConnection) => { return GetAdmin_p(dbConnection, message); }) // 然後確認此用戶是Admin
-            .then((dbConnection) => { return GetMembersNicknameInDb_p(dbConnection, message) }) // 抓出有在資料庫裡的該guild的user
-            .then((map, dbConnection) => {
+    execute(message, args, db) {
+        const originFunc = args[1]['GuildMemberUpdate']; //GuildMemberUpdates
+        args[1]['GuildMemberUpdate'] = function(){};
+        
+
+        GetAdmin_p(db, message) // 確認此用戶是Admin
+            .then(() => { return GetMembersNicknameInDb_p(db, message) }) // 抓出有在資料庫裡的該guild的user
+            .then((map) => {
                 let p = message.guild.members.fetch();// 抓出群組所有人
                 p.then(eachmembers => {
                     // 取得包了目前所有群組裡的人的promise之後，filter掉不在語音群的
@@ -83,10 +75,12 @@ module.exports = {
                 
             })
             .then(() => {
+                args[1]['GuildMemberUpdate'] = originFunc; // 做完事恢復聆聽user的改動
                 message.channel.send("熱狗機器人休眠完成");
             })
             .catch(rejection => { 
                 console.log(rejection); 
+                args[1]['GuildMemberUpdate'] = originFunc; // 做完事恢復聆聽user的改動
                 message.channel.send("You are not a admin");
                 return; 
             });
