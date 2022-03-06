@@ -11,22 +11,16 @@ client['myCommands'] = new Discord.Collection();
 
 const commandsFile = fs.readdirSync('./commands/').filter(f => f.endsWith('.js'));
 
-for(const filename of commandsFile)
-{
+for (const filename of commandsFile) {
     const eachCommand = require(`./commands/${filename}`);
     client.myCommands.set(eachCommand.name, eachCommand);
 }
 
 console.log('loaded ' + commandsFile.length + ' command files');
-
 // (end) To get commands in other files
-
-// Used for disabling certain listener;
-var fc_disableChangNicknameListener = false;
 
 // the command prefix for our bot. such as /mycommand or $mycommand
 const prefix = '!';
-
 // when the client emmited a event called 'ready', do something
 client.once('ready', () => {
     console.log("Hotdog bot is ready.");
@@ -46,25 +40,25 @@ client.on('messageCreate', (message) => {
     const input = message.content.slice(prefix.length).split(/ +/);
     // command is the first text user type in channel that might trigger action, such as !ping, !prefix, !shudown
     const command = input[0].toLowerCase();
-    
+
 
     // check if the user typed command exist
     const commandObject = client.myCommands.get(command);
-    if(commandObject == undefined)
+    if (commandObject == undefined)
         return;
 
     // tasksToSuspend是執行特定任務時需要暫時被關閉的功能
     const tasksToSuspend = {
-        "GuildMemberUpdate":GuildMemberUpdates
+        "GuildMemberUpdate": GuildMemberUpdates
     }
     const args = [input, tasksToSuspend]
     // execute the command by calling methods in objects
     // execute(message, args, db)
     // args[0] = input[] | args[1] = tasksToSuspend[]
     client.myCommands.get(command).execute(message, args, db);
-  
+
     return;
-}); 
+});
 
 // Listen to member join/leaving voice channel
 // needs GUILD_VOICE_STATES option to work when initializing Discord.Client
@@ -76,60 +70,48 @@ client.on('voiceStateUpdate', (oldState, newState) => {
     if (newState.member.id == newState.guild.ownerId) {
         console.log("owner action, aborting");
         return;
-
     }
-    /*if(newState.member.nickname == undefined)
-    {
-        console.log("pepople with no nickname got in");
-        return;
-    }*/
+
     if (newState.member.id == 477998202206027777)
         return;
 
 
     // 改nickname之前，先避免guildMemberUpdate聽到這次事件
-    fc_disableChangNicknameListener = true;
+    //fc_disableChangNicknameListener = true;
 
     // 用於存取DB內的名子
     var originName;
 
-
-    // 初次進入任一語音頻道時
+    // 初次進入任一語音頻道時儲存原本的Nickname
     if (oldState.channelId == undefined && newState.channelId != undefined) {
-        // 儲存原本的Nickname
 
         let name = newState.member.nickname == undefined ? newState.member.user.username : newState.member.nickname;
-        const storeOriginNamesql = "CALL SaveOriginName(" + newState.member.id.toString() +
-            ", " + newState.guild.id.toString() + ", '"
-            + name + "');";
+        const storeOriginNamesql = `Call SaveOriginName(${newState.member.id.toString()}, ${newState.guild.id.toString()},'${name}')`;
 
         db.query(storeOriginNamesql, function (err, rows, result) {
             if (err) throw err;
-            console.log("Storeing current name")
         });
+        console.log("Saved nickname for " + name);
     }
 
     // 任何更換頻道的事情，剛開始的瞬間皆從DB拿回本名
-    const restoreNicknamesql = "SELECT usernickname FROM channel_username_store WHERE user_id = " +
-        newState.member.id.toString();
+    const restoreNicknamesql = `CALL GetUserOriginNickName(${newState.member.id}, ${newState.guild.id})`;
 
-    db.connect(function (err) {
+    db.query(restoreNicknamesql, function (err, rows) {
+        if (err) throw err;
+        try {
+            originName = rows[0]['usernickname'];
+        } catch {
+            console.log("Can't find user origin nickname");
+            //return;
+        }
 
-        db.query(restoreNicknamesql, function (err, rows, result) {
-            if (err) throw err;
-            try {
-                originName = rows[0]['usernickname'];
-            } catch {
-                console.log("Can't find user origin nickname");
-                //return;
-            }
+        if (originName != undefined)
+            newState.member.setNickname(originName, "backtonormal").catch(e => console.log("can't change owner"));
 
-            if (originName != undefined)
-                newState.member.setNickname(originName, "backtonormal").catch(e => console.log("can't change owner"));
-
-            console.log("Restored nickname for " + originName);
-        });
+        console.log("Restored nickname for " + originName);
     });
+
 
 
 
@@ -137,58 +119,47 @@ client.on('voiceStateUpdate', (oldState, newState) => {
     //若非退出語音頻道(也就是單純切換), 額外做下面的事情
     if (newState.channelId != undefined) {
 
+        // 查看channel是否有設定
+        const sql = `CALL GetChannelId(${newState.channelId}, ${newState.guild.id})`
+        console.log("切換頻道");
+        // execute the query
+        let emoji;
+        db.query(sql, function (err, rows, result) {
+            if (err) throw err;
+            try {
+                emoji = rows[0]['specialemoji'];
+            } catch {
+                // 如果沒有找到emoji
+                console.log("Some one joined voice channel: " + newState.channel.name +
+                    "  ,but no channel setting found for this one");
+                return;
+            }
 
-        db.connect(function (err) {
+            // 如果有找到emoji的話
+            if (emoji != undefined) {
 
-            const sql = "SELECT * FROM channel_setting WHERE channel_id = " + newState.channelId +
-                "&& guild_id =" + newState.guild;
+                console.log("selecting emoji");
 
-            // execute the query
-            let emoji;
-            db.query(sql, function (err, rows, result) {
-                if (err) throw err;
-                try {
-                    emoji = rows[0]['specialemoji'];
-                } catch {
-                    // 如果沒有找到emoji
-                    console.log("Some one joined voice channel: " + newState.channel.name +
-                        "  ,but no channel setting found for this one");
-                    return;
-                }
+                let newName = emoji + "" + originName;
 
-
-
-
-                // 如果有找到emoji的話
-                if (emoji != undefined) {
-
-                    //client.channels.cache.get('638705738314809384').send(emoji + " debug");
-
-
-                    console.log("selecting emoji");
-
-                    let newName = emoji + "" + originName;
+                // 改nickname
+                setTimeout(function () {
+                    newState.member.setNickname(newName, "enter sausage").catch(e => console.log("can't change owner"));
+                }, 100)
 
 
 
-                    // 改nickname
-                    setTimeout(function () {
-                        newState.member.setNickname(newName, "enter sausage").catch(e => console.log("can't change owner"));
-                    }, 100)
+            }
 
-                    
-
-                }
-
-            });
+        });
 
 
-        })
+
 
     }
     // 1秒後把guildMemberUpdate的listening改回來
     setTimeout(function () {
-        fc_disableChangNicknameListener = false;
+        //fc_disableChangNicknameListener = false;
     }, 1000)
     return;
 });
@@ -196,38 +167,14 @@ client.on('voiceStateUpdate', (oldState, newState) => {
 
 
 
- // Fire whenever a guild member changes
+// Fire whenever a guild member changes
 client.on('guildMemberUpdate', (oldMember, newMember) => {
-   GuildMemberUpdates(oldMember, newMember)
+    GuildMemberUpdates(oldMember, newMember)
     return;
-}) 
-
-// Fire when bot joined a Guild
-client.on('guildCreate', guild => {
-
-    db.connect(function (err) {
-        // create a query to insert a record to audit table and set time = now, type = 3(joinedguild)
-        let timenow = new Date().toISOString().slice(0, 19).replace("T", " ");
-        let sql = "INSERT INTO actionaudit VALUES(default,'"
-            + timenow + "',1,'Bot Joined Guild: " + guild.name + " id = " + guild.id + " ' , 'client');";
-
-        // execute the query
-        db.query(sql, function (err, result) {
-            if (err) throw err;
-            console.log("Bot joined a server");
-        });
-    });
-    return;
-});
-
+})
 
 // Functions --------------------------------------------------------------
-function GuildMemberUpdates(oldMember, newMember)
-{
-    // voiceStateUpdate use this to temporary disable nickname storage
-    // other wise guildMemberUpdate will store the modified nickname imediately;
-    if (fc_disableChangNicknameListener == true)
-        return;
+function GuildMemberUpdates(oldMember, newMember) {
     if (newMember.id == 477998202206027777)
         return;
 
