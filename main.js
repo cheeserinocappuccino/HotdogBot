@@ -1,5 +1,6 @@
 const appSettings = require('./app-settings.json');
 const mysql = require('mysql2');
+const db = require('./db.js');
 const Discord = require('discord.js');
 const fs = require('fs');
 
@@ -26,29 +27,16 @@ console.log('loaded ' + commandsFile.length + ' command files');
 // Used for disabling certain listener;
 var fc_disableChangNicknameListener = false;
 
-// connect to mysql
-var dbContext = mysql.createConnection(appSettings['mysqlConnection']);
-dbContext.connect(function (err) {
+// write start server audit
+let timenow = new Date().toISOString().slice(0, 19).replace("T", " ");
+let sql = "INSERT INTO actionaudit VALUES(default,'"
+    + timenow + "',1, NULL, 'client')";
+db.query(sql, function (err, result) {
+
     if (err) throw err;
-
-    console.log("mysql server Connected. Writing audit");
-
-    // create a query to insert a record to audit table and set time = now, type = 1(server up)
-    let timenow = new Date().toISOString().slice(0, 19).replace("T", " ");
-    let sql = "INSERT INTO actionaudit VALUES(default,'"
-        + timenow + "',1, NULL, 'client')";
-
-    // execute the query
-    dbContext.query(sql, function (err, result) {
-
-        if (err) throw err;
-        console.log("[server up] audit is inserted");
-    });
-
-
+    console.log("[server up] audit is inserted");
 });
-
-
+//db.end();
 
 // the command prefix for our bot. such as /mycommand or $mycommand
 const prefix = '!';
@@ -80,12 +68,12 @@ client.on('messageCreate', (message) => {
         return;
 
     // execute the command by calling methods in objects
-    client.myCommands.get(command).execute(message, input, dbContext);
+    client.myCommands.get(command).execute(message, input);
   
 
    
 
-    // 睡前關伺服器記得shutdown把名子改回去
+   /*  /* // 睡前關伺服器記得shutdown把名子改回去
     if (command === 'shutdown' && message.author == 295798903171710976) {
         // 改nickname之前，先避免guildMemberUpdate聽到這次事件
         fc_disableChangNicknameListener = true;
@@ -134,7 +122,7 @@ client.on('messageCreate', (message) => {
                 
 
             });
-        });
+        }); 
         
         // 5秒後把guildMemberUpdate的listening改回來
         setTimeout(function () {
@@ -143,9 +131,9 @@ client.on('messageCreate', (message) => {
         message.channel.send("熱狗機器人休眠完成");
         return;
     };
-
+    */
     return;
-});
+}); 
 
 // Listen to member join/leaving voice channel
 // needs GUILD_VOICE_STATES option to work when initializing Discord.Client
