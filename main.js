@@ -3,6 +3,8 @@ const mysql = require('mysql2');
 const db = require('./db.js');
 const Discord = require('discord.js');
 const fs = require('fs');
+const { promise } = require('./db.js');
+const { resolve } = require('path');
 
 const client = new Discord.Client({ intents: ["GUILDS", "GUILD_MESSAGES", "GUILD_PRESENCES", "GUILD_VOICE_STATES", "GUILD_MEMBERS"] });
 
@@ -60,8 +62,9 @@ client.on('messageCreate', (message) => {
     return;
 });
 
-// Listen to member join/leaving voice channel
-// needs GUILD_VOICE_STATES option to work when initializing Discord.Client
+
+// user更改頻道時就會發動
+// 這個事件需要在initialize Discord.Client的時候包含GUILD_VOICE_STATES option，才會運作
 client.on('voiceStateUpdate', (oldState, newState) => {
     // 設定只在有進出頻道時才啟動，否則return不做事
     if (oldState.channelId == newState.channelId)
@@ -72,100 +75,28 @@ client.on('voiceStateUpdate', (oldState, newState) => {
         return;
     }
 
-    if (newState.member.id == 477998202206027777)
-        return;
+    
+    // 暫時關閉GuildMemberUpdates (使function內容為空)
+    const originGMU = GuildMemberUpdates;
+    GuildMemberUpdates = function () { };
+    
+   
 
+    // 用來暫放GetNameForChangedStateUser的回傳
+    let gl_OriginName;
+    // 檢查是否為第一次進入任一語音頻道，若有，儲存被bot修改前的本名，若無則繼續
+    FirstInVoiceChannel(oldState, newState)
+        .then(() => { return GetNameForChangedStateUser(oldState, newState) })// 接著，先從DB拿回本名
+        .then(originName => { gl_OriginName = originName; console.log('ch originName'); return newState.member.setNickname(originName, "backtonormal");}) // 利用上一句的回傳(origiName)，將user先設定為本名，若為退出頻道，只會運行到這句，下一句收到會直接return
+        .then(guildMember => { return GetPrefixPlusUsername(oldState, newState, gl_OriginName) }) // 找到該語音群的prefix，傳給下一句
+        .then(newName => {console.log('ch prefix') ;return newState.member.setNickname(newName, "enter prefixed channel") }) // 實際更改username
+        .then(() =>{
+            GuildMemberUpdates = originGMU;
+            console.log("Finished change nickname");
+        }) // 事情結束，將GuildMemberUpdates恢復原狀
+        .catch(err => console.log(err + " --rejected from VoiceStateUpdate")) // resolve上面任何一串的reject
 
-    // 改nickname之前，先避免guildMemberUpdate聽到這次事件
-    //fc_disableChangNicknameListener = true;
-
-    // 用於存取DB內的名子
-    var originName;
-
-    // 初次進入任一語音頻道時儲存原本的Nickname
-    if (oldState.channelId == undefined && newState.channelId != undefined) {
-
-        let name = newState.member.nickname == undefined ? newState.member.user.username : newState.member.nickname;
-        const storeOriginNamesql = `Call SaveOriginName(${newState.member.id.toString()}, ${newState.guild.id.toString()},'${name}')`;
-
-        db.query(storeOriginNamesql, function (err, rows, result) {
-            if (err) throw err;
-        });
-        console.log("Saved nickname for " + name);
-    }
-
-    // 任何更換頻道的事情，剛開始的瞬間皆從DB拿回本名
-    const restoreNicknamesql = `CALL GetUserOriginNickName(${newState.member.id}, ${newState.guild.id})`;
-
-    db.query(restoreNicknamesql, function (err, rows) {
-        if (err) throw err;
-        try {
-            originName = rows[0]['usernickname'];
-        } catch {
-            console.log("Can't find user origin nickname");
-            //return;
-        }
-
-        if (originName != undefined)
-            newState.member.setNickname(originName, "backtonormal").catch(e => console.log("can't change owner"));
-
-        console.log("Restored nickname for " + originName);
-    });
-
-
-
-
-
-    //若非退出語音頻道(也就是單純切換), 額外做下面的事情
-    if (newState.channelId != undefined) {
-
-        // 查看channel是否有設定
-        const sql = `CALL GetChannelId(${newState.channelId}, ${newState.guild.id})`
-        console.log("切換頻道");
-        // execute the query
-        let emoji;
-        db.query(sql, function (err, rows, result) {
-            if (err) throw err;
-            try {
-                emoji = rows[0]['specialemoji'];
-            } catch {
-                // 如果沒有找到emoji
-                console.log("Some one joined voice channel: " + newState.channel.name +
-                    "  ,but no channel setting found for this one");
-                return;
-            }
-
-            // 如果有找到emoji的話
-            if (emoji != undefined) {
-
-                console.log("selecting emoji");
-
-                let newName = emoji + "" + originName;
-
-                // 改nickname
-                setTimeout(function () {
-                    newState.member.setNickname(newName, "enter sausage").catch(e => console.log("can't change owner"));
-                }, 100)
-
-
-
-            }
-
-        });
-
-
-
-
-    }
-    // 1秒後把guildMemberUpdate的listening改回來
-    setTimeout(function () {
-        //fc_disableChangNicknameListener = false;
-    }, 1000)
-    return;
 });
-
-
-
 
 // Fire whenever a guild member changes
 client.on('guildMemberUpdate', (oldMember, newMember) => {
@@ -175,11 +106,8 @@ client.on('guildMemberUpdate', (oldMember, newMember) => {
 
 // Functions --------------------------------------------------------------
 function GuildMemberUpdates(oldMember, newMember) {
-    if (newMember.id == 477998202206027777)
-        return;
 
     console.log("detect manual guildmemberUpdate");
-
 
     // Do shit when any user changed their nickname
     if (newMember.nickname != oldMember.nickname) {
@@ -201,6 +129,87 @@ function GuildMemberUpdates(oldMember, newMember) {
         });
     }
 }
+
+function FirstInVoiceChannel(oldState, newState) {
+    // 若為初次進入頻道...
+    return new Promise((resolve, reject) => {
+        // 設定為只有在初次進入語音頻道才執行將原名存入DB的事情
+        if (!(oldState.channelId == undefined && newState.channelId != undefined))
+            return resolve();
+
+        // 如果user沒有nickname, 就將原名設定為帳號名
+        let name = newState.member.nickname == undefined ? newState.member.user.username : newState.member.nickname;
+        // sql語句，用來儲存修改前的原名
+        const storeOriginNamesql = `Call SaveOriginName(${newState.member.id.toString()}, ${newState.guild.id.toString()},'${name}')`;
+        // 執行儲存修改前的原名
+        db.query(storeOriginNamesql, function (err, rows, result) {
+            if (err)
+                return reject(err + " from getPrefixPlusUsername");
+            else {
+                console.log("Saved nickname for " + name);
+                return resolve();
+            }
+
+
+        });
+
+    })
+}
+
+function GetNameForChangedStateUser(oldState, newState) {
+
+    // sql語句，用來取得該user的本名
+    const restoreNicknamesql = `CALL GetUserOriginNickName(${newState.member.id}, ${newState.guild.id})`;
+
+    // 執行sql，取得本名並利用Promise的resolved回傳
+    return new Promise((resolve, reject) => {
+
+        db.query(restoreNicknamesql, function (err, rows) {
+            if (err)
+                return reject(err + " from getPrefixPlusUsername");
+            else if (rows[0][0]['usernickname'] == undefined)
+                return reject("Can't find user origin nickname")
+
+            const originName = rows[0][0]['usernickname'];
+            console.log("this user's originName = " + originName);
+            return resolve(originName)
+            
+
+        });
+
+    });
+}
+
+function GetPrefixPlusUsername(oldState, newState, originName) {
+
+    return new Promise((resolve, reject) => {
+        // 若為退出頻道，這個function不用做事
+        if (newState.channelId == undefined)
+            return resolve();
+        // 若非退出語音頻道(也就是單純切換於兩個語音頻道，或者剛加入頻道),做下面的事情，將prefix加入userName中
+
+        // sql語句，查看該語音channel是否有設定
+        const sql = `CALL GetChannelId(${newState.channelId}, ${newState.guild.id})`
+
+        // execute the query
+        db.query(sql, function (err, rows, result) {
+            if (err)
+                return reject(err + " from getPrefixPlusUsername");
+            else if (rows[0][0]['specialemoji'] == undefined)
+                return reject('有人加入語音群,但此語音群沒有設定的prefix');
+
+            // 若有找到prefix，將他加入username中，並利用resolve()回傳
+            const prefix = rows[0][0]['specialemoji'];
+            const newName = prefix + "" + originName;
+
+            console.log("Assembled new name.");
+            return resolve(newName);
+
+        });
+
+    })
+}
+
 
 
 // login, keep this at the bottom of main()
