@@ -1,8 +1,27 @@
 const appSettings = require('./app-settings.json');
 const mysql = require('mysql2');
 const Discord = require('discord.js');
+const fs = require('fs');
 
 const client = new Discord.Client({ intents: ["GUILDS", "GUILD_MESSAGES", "GUILD_PRESENCES", "GUILD_VOICE_STATES", "GUILD_MEMBERS"] });
+
+// (start) To get commands in other files
+
+// create a object called client.myCommands to store external commands object, it is type of Discord.Collection
+// Discord.Collection is basically a extention of JS Map object;
+client['myCommands'] = new Discord.Collection();
+
+const commandsFile = fs.readdirSync('./commands/').filter(f => f.endsWith('.js'));
+
+for(const filename of commandsFile)
+{
+    const eachCommand = require(`./commands/${filename}`);
+    client.myCommands.set(eachCommand.name, eachCommand);
+}
+
+console.log('loaded ' + commandsFile.length + ' command files');
+
+// (end) To get commands in other files
 
 // Used for disabling certain listener;
 var fc_disableChangNicknameListener = false;
@@ -48,40 +67,23 @@ client.on('messageCreate', (message) => {
     if (message.member.id == 477998202206027777)
         return;
 
-    // pre process commands before processing;
+    // pre process commands 
+    // input is a array of command + all other arguments user typed in channel.
     const input = message.content.slice(prefix.length).split(/ +/);
+    // command is the first text user type in channel that might trigger action, such as !ping, !prefix, !shudown
     const command = input[0].toLowerCase();
-    console.log("Received command \n raw =" + message.content + " \n input =" + input + "\n pure =" + command)
+    //console.log("Received command \n raw =" + message.content + " \n input =" + input + "\n pure =" + command)
 
-    if (command === 'ping') {
-        message.channel.send('pong');
-    }
+    // check if the user typed command exist
+    const commandObject = client.myCommands.get(command);
+    if(commandObject == undefined)
+        return;
 
-    if (command === 'prefix') {
-        if (input[1].length > 20) {
-            message.channel.send("字數過長");
-            return;
-        }
-        else if (message.member.voice.channelId == undefined) {
-            message.channel.send("請進入語音頻道再做此設定")
-            return;
-        }
+    // execute the command by calling methods in objects
+    client.myCommands.get(command).execute(message, input, dbContext);
+  
 
-        console.log("Adding emoji to database");
-        let addChannelSettingsql = "CALL SaveChannelSettings(" + message.member.voice.channelId.toString() +
-            ", " + message.member.guild.id.toString() + ", '"
-            + input[1] + "');";
-
-        dbContext.query(addChannelSettingsql, function (err, rows, result) {
-            if (err) throw err;
-        });
-
-        message.channel.send("語音頻道 " + message.member.voice.channel.name + " 的前綴已經設定為: " + input[1]);
-    }
-
-    if (command === '俎達') {
-        //message.channel.send('');
-    }
+   
 
     // 睡前關伺服器記得shutdown把名子改回去
     if (command === 'shutdown' && message.author == 295798903171710976) {
@@ -303,7 +305,7 @@ client.on('guildMemberUpdate', (oldMember, newMember) => {
 
         dbContext.query(storeOriginNamesql, function (err, rows, result) {
             if (err) throw err;
-
+            return;
         });
     }
     return;
