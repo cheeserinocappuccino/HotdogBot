@@ -12,17 +12,15 @@ module.exports = {
         }
 
         console.log("Adding emoji to database");
-        /*let sql = "CALL SaveChannelSettings(" + message.member.voice.channelId.toString() +
-            ", " + message.member.guild.id.toString() + ", '"
-            + args[1] + "');";*/
+        
         let sql = `CALL SaveChannelSettings(${message.member.voice.channelId.toString()},
                                                 ${message.member.guild.id.toString()},
-                                                '${args[1]}')`;
+                                                '${args[0][1]}')`;
         db.query(sql, function (err, rows, result) {
             if (err) throw err;
         });
 
-        message.channel.send("語音頻道 " + message.member.voice.channel.name + " 的前綴已經設定為: " + args[1]);
+        message.channel.send("語音頻道 " + message.member.voice.channel.name + " 的前綴已經設定為: " + args[0][1]);
     }
 
 }

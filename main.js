@@ -8,6 +8,12 @@ const { resolve } = require('path');
 
 const client = new Discord.Client({ intents: ["GUILDS", "GUILD_MESSAGES", "GUILD_PRESENCES", "GUILD_VOICE_STATES", "GUILD_MEMBERS"] });
 
+// tasksToSuspend是執行特定任務時需要暫時被關閉的功能
+const tasksToSuspend = {
+    "GuildMemberUpdate": GuildMemberUpdates
+}
+
+
 // (start) To get commands in other files
 client['myCommands'] = new Discord.Collection();
 
@@ -49,10 +55,7 @@ client.on('messageCreate', (message) => {
     if (commandObject == undefined)
         return;
 
-    // tasksToSuspend是執行特定任務時需要暫時被關閉的功能
-    const tasksToSuspend = {
-        "GuildMemberUpdate": GuildMemberUpdates
-    }
+    
     const args = [input, tasksToSuspend]
     // execute the command by calling methods in objects
     // execute(message, args, db)
@@ -64,7 +67,7 @@ client.on('messageCreate', (message) => {
 
 
 // user更改頻道時就會發動
-// 這個事件需要在initialize Discord.Client的時候包含GUILD_VOICE_STATES option，才會運作
+// 這個事件需要在initialize Discord.Client的時候包含GUILD_VOICE_STATES option才會運作
 client.on('voiceStateUpdate', (oldState, newState) => {
     // 設定只在有進出頻道時才啟動，否則return不做事
     if (oldState.channelId == newState.channelId)
@@ -77,10 +80,16 @@ client.on('voiceStateUpdate', (oldState, newState) => {
 
     
     // 暫時關閉GuildMemberUpdates (使function內容為空)
-    const originGMU = GuildMemberUpdates;
-    GuildMemberUpdates = function () { };
+    let originGMU;
+    if(GuildMemberUpdates.toString().length > 20)
+    {
+        originGMU = GuildMemberUpdates;
+        GuildMemberUpdates = function () {};
+    }
     
-   
+    
+    
+    
 
     // 用來暫放GetNameForChangedStateUser的回傳
     let gl_OriginName;
@@ -91,7 +100,8 @@ client.on('voiceStateUpdate', (oldState, newState) => {
         .then(guildMember => { return GetPrefixPlusUsername(oldState, newState, gl_OriginName) }) // 找到該語音群的prefix，傳給下一句
         .then(newName => {console.log('ch prefix') ;return newState.member.setNickname(newName, "enter prefixed channel") }) // 實際更改username
         .then(() =>{
-            GuildMemberUpdates = originGMU;
+            if(originGMU.toString().length > 20)
+                GuildMemberUpdates = originGMU;
             console.log("Finished change nickname");
         }) // 事情結束，將GuildMemberUpdates恢復原狀
         .catch(err => console.log(err + " --rejected from VoiceStateUpdate")) // resolve上面任何一串的reject
@@ -100,14 +110,18 @@ client.on('voiceStateUpdate', (oldState, newState) => {
 
 // Fire whenever a guild member changes
 client.on('guildMemberUpdate', (oldMember, newMember) => {
-    GuildMemberUpdates(oldMember, newMember)
-    return;
+    const p = GuildMemberUpdates(oldMember, newMember);
+    if(p != undefined)
+        p.then(() => {return;});
+    else
+        return;
 })
 
 // Functions --------------------------------------------------------------
 function GuildMemberUpdates(oldMember, newMember) {
 
-    console.log("detect manual guildmemberUpdate");
+    return new Promise((resolve, reject) => {
+        console.log("detect manual guildmemberUpdate");
 
     // Do shit when any user changed their nickname
     if (newMember.nickname != oldMember.nickname) {
@@ -124,10 +138,13 @@ function GuildMemberUpdates(oldMember, newMember) {
             + uname + "');";
 
         db.query(storeOriginNamesql, function (err, rows, result) {
-            if (err) throw err;
-            return;
+            if (err) 
+                return reject(err + " from GuildMemberUpdates");
+
+            return resolve('Done db storing');
         });
     }
+    })
 }
 
 function FirstInVoiceChannel(oldState, newState) {
