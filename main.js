@@ -55,7 +55,7 @@ client.on('messageCreate', (message) => {
     if (commandObject == undefined)
         return;
 
-    
+
     const args = [input, tasksToSuspend]
     // execute the command by calling methods in objects
     // execute(message, args, db)
@@ -78,29 +78,28 @@ client.on('voiceStateUpdate', (oldState, newState) => {
         return;
     }
 
-    
+
     // 暫時關閉GuildMemberUpdates (使function內容為空)
-    let originGMU;
-    if(GuildMemberUpdates.toString().length > 20)
-    {
+    let originGMU = function () { };
+    if (GuildMemberUpdates.toString().length > 20) {
         originGMU = GuildMemberUpdates;
-        GuildMemberUpdates = function () {};
+        GuildMemberUpdates = function () { };
     }
-    
-    
-    
-    
+
+
+
+
 
     // 用來暫放GetNameForChangedStateUser的回傳
     let gl_OriginName;
     // 檢查是否為第一次進入任一語音頻道，若有，儲存被bot修改前的本名，若無則繼續
     FirstInVoiceChannel(oldState, newState)
         .then(() => { return GetNameForChangedStateUser(oldState, newState) })// 接著，先從DB拿回本名
-        .then(originName => { gl_OriginName = originName; console.log('ch originName'); return newState.member.setNickname(originName, "backtonormal");}) // 利用上一句的回傳(origiName)，將user先設定為本名，若為退出頻道，只會運行到這句，下一句收到會直接return
+        .then(originName => { gl_OriginName = originName; console.log('ch originName'); return newState.member.setNickname(originName, "backtonormal"); }) // 利用上一句的回傳(origiName)，將user先設定為本名，若為退出頻道，只會運行到這句，下一句收到會直接return
         .then(guildMember => { return GetPrefixPlusUsername(oldState, newState, gl_OriginName) }) // 找到該語音群的prefix，傳給下一句
-        .then(newName => {console.log('ch prefix') ;return newState.member.setNickname(newName, "enter prefixed channel") }) // 實際更改username
-        .then(() =>{
-            if(originGMU.toString().length > 20)
+        .then(newName => { console.log('ch prefix'); return newState.member.setNickname(newName, "enter prefixed channel") }) // 實際更改username
+        .then(() => {
+            if (originGMU.toString().length > 20)
                 GuildMemberUpdates = originGMU;
             console.log("Finished change nickname");
         }) // 事情結束，將GuildMemberUpdates恢復原狀
@@ -111,8 +110,8 @@ client.on('voiceStateUpdate', (oldState, newState) => {
 // Fire whenever a guild member changes
 client.on('guildMemberUpdate', (oldMember, newMember) => {
     const p = GuildMemberUpdates(oldMember, newMember);
-    if(p != undefined)
-        p.then(() => {return;});
+    if (p != undefined)
+        p.then(() => { return; });
     else
         return;
 })
@@ -123,27 +122,27 @@ function GuildMemberUpdates(oldMember, newMember) {
     return new Promise((resolve, reject) => {
         console.log("detect manual guildmemberUpdate");
 
-    // Do shit when any user changed their nickname
-    if (newMember.nickname != oldMember.nickname) {
+        // Do shit when any user changed their nickname
+        if (newMember.nickname != oldMember.nickname) {
 
-        let uname = newMember.nickname == undefined ? newMember.user.username : newMember.nickname;
-        console.log("A user Changed their nickname to: "
-            + uname + " , initialize new nickname db storing");
+            let uname = newMember.nickname == undefined ? newMember.user.username : newMember.nickname;
+            console.log("A user Changed their nickname to: "
+                + uname + " , initialize new nickname db storing");
 
 
 
-        // 儲存修改完的Nickname作為退出語音群時的設定
-        const storeOriginNamesql = "CALL SaveOriginName(" + newMember.id.toString() +
-            ", " + newMember.guild.id.toString() + ", '"
-            + uname + "');";
+            // 儲存修改完的Nickname作為退出語音群時的設定
+            const storeOriginNamesql = "CALL SaveOriginName(" + newMember.id.toString() +
+                ", " + newMember.guild.id.toString() + ", '"
+                + uname + "');";
 
-        db.query(storeOriginNamesql, function (err, rows, result) {
-            if (err) 
-                return reject(err + " from GuildMemberUpdates");
+            db.query(storeOriginNamesql, function (err, rows, result) {
+                if (err)
+                    return reject(err + " from GuildMemberUpdates");
 
-            return resolve('Done db storing');
-        });
-    }
+                return resolve('Done db storing');
+            });
+        }
     })
 }
 
@@ -190,7 +189,7 @@ function GetNameForChangedStateUser(oldState, newState) {
             const originName = rows[0][0]['usernickname'];
             console.log("this user's originName = " + originName);
             return resolve(originName)
-            
+
 
         });
 
