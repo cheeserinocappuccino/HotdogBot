@@ -211,7 +211,7 @@ function GetPrefixPlusUsername(oldState, newState, originName) {
         db.query(sql, function (err, rows, result) {
             if (err)
                 return reject(err + " from getPrefixPlusUsername");
-            else if (rows[0][0]['specialemoji'] == undefined)
+            if (typeof rows[0][0] === "undefined")
                 return reject('有人加入語音群,但此語音群沒有設定的prefix');
 
             // 若有找到prefix，將他加入username中，並利用resolve()回傳
