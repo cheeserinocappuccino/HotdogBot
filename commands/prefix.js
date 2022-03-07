@@ -12,15 +12,23 @@ module.exports = {
         }
 
         console.log("Adding emoji to database");
-        
+        let prefixString = "";
+        for(let i = 1; i < args[0].length; i++){
+            prefixString += args[0][i];
+
+            // 暫時限制設定時只能堆疊五次prefix
+            if(i >= 5)
+                break;
+        }
+
         let sql = `CALL SaveChannelSettings(${message.member.voice.channelId.toString()},
                                                 ${message.member.guild.id.toString()},
-                                                '${args[0][1]}')`;
+                                                '${prefixString}')`;
         db.query(sql, function (err, rows, result) {
             if (err) throw err;
         });
 
-        message.channel.send("語音頻道 " + message.member.voice.channel.name + " 的前綴已經設定為: " + args[0][1]);
+        message.channel.send("語音頻道 " + message.member.voice.channel.name + " 的前綴已經設定為: " + prefixString);
     }
 
 }
