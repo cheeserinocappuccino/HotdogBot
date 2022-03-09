@@ -71,7 +71,7 @@ module.exports = {
                     if (guildAllNickname.get(mem[0]) != undefined) {
 
                         const originName = guildAllNickname.get(mem[0]);
-
+                        
                         // 將setNickName回傳的個別promise放進陣列，讓Promise.all判斷等到全數resolve才做下一步
                         allPromises.push(mem[1].setNickname(originName, "due to shutdown"));
 

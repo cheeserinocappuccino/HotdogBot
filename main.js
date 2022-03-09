@@ -102,8 +102,9 @@ client.on('voiceStateUpdate', (oldState, newState) => {
             if (originGMU.toString().length > 20)
                 GuildMemberUpdates = originGMU;
             console.log("Finished change nickname");
+            return;
         }) // 事情結束，將GuildMemberUpdates恢復原狀
-        .catch(err => console.log(err + " --rejected from VoiceStateUpdate")) // resolve上面任何一串的reject
+        .catch(err => {console.log(err + " --rejected from VoiceStateUpdate"); return;}) // resolve上面任何一串的reject
 
 });
 
