@@ -44,9 +44,11 @@ function GetMembersNicknameInDb_p(dbConnection, message) {
 module.exports = {
     "name": "shutdown",
     "description": "A command for admin to shutdown bot, clean all stats apply to other user.",
-    execute(message, args, db) {
-        const originFunc = args[1]['GuildMemberUpdate']; //GuildMemberUpdates
-        args[1]['GuildMemberUpdate'] = function () { };
+    execute(message, inputs, tasksHandles, db) {
+        // 關閉GuildMemberUpdates的功能，避免一改名子程式就想把改後的名子存到DB
+        const originFunc = tasksHandles['GuildMemberUpdate']; //GuildMemberUpdates
+        tasksHandles['GuildMemberUpdate'] = function () { };
+        console.log(tasksHandles['GuildMemberUpdate'].toString() + "++++");
 
         // 用來儲存資料庫抓的所有nickname
         let guildAllNickname;
@@ -65,7 +67,7 @@ module.exports = {
                 // map is the return of last .then(), which is the return of GetMembersNicknameInDb_p(dbConnection, message)
                 // map = SELECT user_id, nickname FROM .... WHERE guild_id = ...
                 for (let mem of filteredMembers) {
-                    // important notes below
+                    // IMPORTANT NOTE BELOW
                     // mems[0] = user ID
                     // mem[1] = GuildMember Object
                     if (guildAllNickname.get(mem[0]) != undefined) {
@@ -92,13 +94,14 @@ module.exports = {
                 });
             })
             .then((nums) => {
-                args[1]['GuildMemberUpdate'] = originFunc; // 做完事恢復聆聽user的改動
+                tasksHandles['GuildMemberUpdate'] = originFunc; // 做完事恢復聆聽user的改動
                 console.log(`回復了 ${nums} 人的鳴子, 熱狗機器人休眠完成`);
                 message.channel.send(`回復了 ${nums} 人的鳴子, 熱狗機器人休眠完成`);
+                return;
             })
             .catch(rejection => {
                 console.log(rejection);
-                args[1]['GuildMemberUpdate'] = originFunc; // 做完事恢復聆聽user的改動
+                tasksHandles['GuildMemberUpdate'] = originFunc; // 做完事恢復聆聽user的改動
                 message.channel.send("You are not a admin");
                 return;
             });

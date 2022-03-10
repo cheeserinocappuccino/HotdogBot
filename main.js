@@ -8,8 +8,8 @@ const { resolve } = require('path');
 
 const client = new Discord.Client({ intents: ["GUILDS", "GUILD_MESSAGES", "GUILD_PRESENCES", "GUILD_VOICE_STATES", "GUILD_MEMBERS"] });
 
-// tasksToSuspend是執行特定任務時需要暫時被關閉的功能
-const tasksToSuspend = {
+// tasksHandles是執行特定任務時需要暫時被關閉的功能
+const tasksHandles = {
     "GuildMemberUpdate": GuildMemberUpdates
 }
 
@@ -45,9 +45,9 @@ client.on('messageCreate', (message) => {
 
     // pre process commands 
     // input is a array of command + all other arguments user typed in channel.
-    const input = message.content.slice(prefix.length).split(/ +/);
+    const inputs = message.content.slice(prefix.length).split(/ +/);
     // command is the first text user type in channel that might trigger action, such as !ping, !prefix, !shudown
-    const command = input[0].toLowerCase();
+    const command = inputs[0].toLowerCase();
 
 
     // check if the user typed command exist
@@ -56,11 +56,9 @@ client.on('messageCreate', (message) => {
         return;
 
 
-    const args = [input, tasksToSuspend]
-    // execute the command by calling methods in objects
-    // execute(message, args, db)
-    // args[0] = input[] | args[1] = tasksToSuspend[]
-    client.myCommands.get(command).execute(message, args, db);
+    
+    // execute the command by calling methods that stored in objects
+    client.myCommands.get(command).execute(message, inputs, tasksHandles, db);
 
     return;
 });
@@ -81,9 +79,9 @@ client.on('voiceStateUpdate', (oldState, newState) => {
 
     // 暫時關閉GuildMemberUpdates (使function內容為空)
     let originGMU = function () { };
-    if (GuildMemberUpdates.toString().length > 20) {
-        originGMU = GuildMemberUpdates;
-        GuildMemberUpdates = function () { };
+    if (tasksHandles['GuildMemberUpdate'].toString().length > 20) {
+        originGMU = tasksHandles['GuildMemberUpdate'];
+        tasksHandles['GuildMemberUpdate'] = function () { };
     }
 
 
@@ -100,7 +98,7 @@ client.on('voiceStateUpdate', (oldState, newState) => {
         .then(newName => { console.log('ch prefix'); return newState.member.setNickname(newName, "enter prefixed channel") }) // 實際更改username
         .then(() => {
             if (originGMU.toString().length > 20)
-                GuildMemberUpdates = originGMU;
+            tasksHandles['GuildMemberUpdate'] = originGMU;
             console.log("Finished change nickname");
             return;
         }) // 事情結束，將GuildMemberUpdates恢復原狀
@@ -110,8 +108,10 @@ client.on('voiceStateUpdate', (oldState, newState) => {
 
 // Fire whenever a guild member changes
 client.on('guildMemberUpdate', (oldMember, newMember) => {
-    const p = GuildMemberUpdates(oldMember, newMember);
-    if (p != undefined)
+    
+    const p = tasksHandles['GuildMemberUpdate'](oldMember, newMember);
+
+    if (p != undefined )
         p.then(() => { return; });
     else
         return;
@@ -213,13 +213,13 @@ function GetPrefixPlusUsername(oldState, newState, originName) {
             if (err)
                 return reject(err + " from getPrefixPlusUsername");
             if (typeof rows[0][0] === "undefined")
-                return reject('有人加入語音群,但此語音群沒有設定的prefix');
+                return reject(`${originName} 加入語音群,但此[${newState.channel.name}]語音群沒有設定的prefix`);
 
             // 若有找到prefix，將他加入username中，並利用resolve()回傳
             const prefix = rows[0][0]['specialemoji'];
             const newName = prefix + "" + originName;
 
-            console.log("Assembled new name.");
+            console.log("Assembled new name for " + originName + "In " + newState.channel.name);
             return resolve(newName);
 
         });
