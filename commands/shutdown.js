@@ -48,7 +48,6 @@ module.exports = {
         // 關閉GuildMemberUpdates的功能，避免一改名子程式就想把改後的名子存到DB
         const originFunc = tasksHandles['GuildMemberUpdate']; //GuildMemberUpdates
         tasksHandles['GuildMemberUpdate'] = function () { };
-        console.log(tasksHandles['GuildMemberUpdate'].toString() + "++++");
 
         // 用來儲存資料庫抓的所有nickname
         let guildAllNickname;
@@ -86,10 +85,10 @@ module.exports = {
                 const p_all = Promise.all(allPromises);
 
                 // promise後的.then(return //something)結束後，也是回傳一個Promise
-                // 如果單寫.then(return //something)而未回傳，會被最外層的Promise chain視為平行的分支
+                // 如果單寫p_all.then(()...)而非return p_all.then(()...)，會被最外層的Promise chain視為平行的分支
                 // 就會被跳過先去運行外層的chain，造成allpromises.length還未被defined
+                // 總之請記得每個then都要回傳一個promise型別，才會照順序運行
                 return p_all.then(() => {
-                    console.log(allPromises.length + " <<<<< all promises count");
                     return allPromises.length;
                 });
             })

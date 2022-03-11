@@ -109,10 +109,14 @@ client.on('voiceStateUpdate', (oldState, newState) => {
 // Fire whenever a guild member changes
 client.on('guildMemberUpdate', (oldMember, newMember) => {
     
-    /*const p =*/ //tasksHandles['GuildMemberUpdate'](oldMember, newMember);
+    //console.log(tasksHandles['GuildMemberUpdate'].toString() + " <<func")
 
     if (tasksHandles['GuildMemberUpdate'].toString().length > 30 )
+    {
+        
         tasksHandles['GuildMemberUpdate'](oldMember, newMember);
+    }
+        
     else
         return;
 })
@@ -121,7 +125,6 @@ client.on('guildMemberUpdate', (oldMember, newMember) => {
 function GuildMemberUpdates(oldMember, newMember) {
 
     return new Promise((resolve, reject) => {
-        console.log("detect manual guildmemberUpdate");
 
         // Do shit when any user changed their nickname
         if (newMember.nickname != oldMember.nickname) {
