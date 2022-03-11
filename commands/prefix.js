@@ -1,3 +1,4 @@
+const apply = require('./apply.js');
 module.exports = {
     "name": "prefix",
     'description': 'A command to set channel\'s prefix emoji or text',
@@ -40,6 +41,7 @@ module.exports = {
         })
 
         p.then(() => {
+            apply.execute(message, inputs, tasksHandles, db, true);
             message.channel.send("語音頻道 " + message.member.voice.channel.name + " 的前綴已經設定為: " + prefixString);
             return;
         });

@@ -4,7 +4,7 @@ const { promise } = require("../db");
 module.exports = {
     "name": "apply",
     "description": "For manually changing all user's nickname with channel prefix",
-    execute(message, inputs, tasksHandles, db) {
+    execute(message, inputs, tasksHandles, db, adminBypassIdentifier) {
         // 關閉GuildMemberUpdates的功能，避免一改名子程式就想把改後的名子存到DB
         const originFunc = tasksHandles['GuildMemberUpdate']; //GuildMemberUpdates
         tasksHandles['GuildMemberUpdate'] = function () { };
@@ -14,7 +14,7 @@ module.exports = {
         let allmembers;
 
         // 先確認發訊息者是admin，否則直接return reject
-        CheckAdmin(message, db)
+        CheckAdmin(message, db, adminBypassIdentifier)
             // sql: 取得該伺服器的所有原名資料
             // 處理: 承上，將原名資料改為Map結構，key為user_id, value 為 originame
             .then(() => { return GetOriginName(message, db) })
@@ -59,14 +59,14 @@ module.exports = {
 
 }
 
-function CheckAdmin(message, db) {
+function CheckAdmin(message, db, adminBypassIdentifier) {
     return new Promise((resolve, reject) => {
         const sql = `CALL CheckAdmin(${message.member.id},${message.guildId})`;
 
         db.query(sql, (err, rows) => {
             if (err)
                 return reject(err + " from apply.checkAdmin");
-            if (rows[0][0] == undefined) {
+            if (rows[0][0] == undefined && !adminBypassIdentifier) {
                 message.channel.send(`Admin才可使用此指令`);
                 return reject(`A non-admin ${message.author.username} tried to use command "apply"`);
             }
@@ -105,7 +105,7 @@ function SetToOriginName(members, dbNameMap) {
     return new Promise((resolve, reject) => {
         for (let mem of members) {
 
-            if (dbNameMap.get(mem[0]) != undefined) {
+            if (dbNameMap.get(mem[0]) != undefined && mem[0] != mem[1].guild.ownerId) {
                 let originName = dbNameMap.get(mem[0]);
 
                 allPromises.push(mem[1].setNickname(originName, "due to prepare apply"));
@@ -166,7 +166,9 @@ function ApplyPrefixNickName(channelPrefixsMap,dbNameMap, allmembers) {
         const originName = dbNameMap.get(mem_id);
         const prefix = channelPrefixsMap.get(mem_obj.voice.channelId);
         const n = prefix + "" + originName;
-        if (prefix != undefined) {
+
+        // 記得擋住遇到owner的時候 mem_id != mem_obj.guild.ownerId
+        if (prefix != undefined && mem_id != mem_obj.guild.ownerId) {
             chNameCount++;
             promiseArr.push(mem_obj.setNickname(n, "due to apply"));
         }
