@@ -49,6 +49,10 @@ client.on('messageCreate', (message) => {
     // command is the first text user type in channel that might trigger action, such as !ping, !prefix, !shudown
     const command = inputs[0].toLowerCase();
 
+    for(let i = 0; i < inputs.length; i++)
+    {
+        console.log(`${inputs[i]} <<第 ${i} 個指令串`);
+    }
 
     // check if the user typed command exist
     const commandObject = client.myCommands.get(command);
