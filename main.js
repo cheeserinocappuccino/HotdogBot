@@ -109,10 +109,10 @@ client.on('voiceStateUpdate', (oldState, newState) => {
 // Fire whenever a guild member changes
 client.on('guildMemberUpdate', (oldMember, newMember) => {
     
-    const p = tasksHandles['GuildMemberUpdate'](oldMember, newMember);
+    /*const p =*/ //tasksHandles['GuildMemberUpdate'](oldMember, newMember);
 
-    if (p != undefined )
-        p.then(() => { return; });
+    if (tasksHandles['GuildMemberUpdate'].toString().length > 30 )
+        tasksHandles['GuildMemberUpdate'](oldMember, newMember);
     else
         return;
 })
