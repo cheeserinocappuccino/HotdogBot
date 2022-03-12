@@ -1,6 +1,6 @@
 
 // Async forloop https://stackoverflow.com/questions/40328932/javascript-es6-promise-for-loop
-function CheckAdmin(message, db) {
+function CheckAdmin(message, db, adminBypassIdentifier) {
     return new Promise((resolve, reject) => {
         const sql = `CALL CheckAdmin(${message.member.id},${message.guildId})`;
 
@@ -19,12 +19,18 @@ function CheckAdmin(message, db) {
 
 function CheckValidTarget(message, userTarget) {
     return new Promise((resolve, reject) => {
-        const p = message.guild.members.fetch(userTarget);
-        p.then((user => {
-            if (user == undefined)
-                reject('User不存在');
-            resolve(user);
-        }))
+
+        message.guild.members.fetch(userTarget)
+            .then(user => {
+                if (user == undefined)
+                    reject('User不存在');
+                resolve(user);
+            }).catch(() => {
+                console.log("User不存在")
+                reject('User不存在')
+            }
+            )
+
     })
 }
 
@@ -42,7 +48,7 @@ module.exports = {
             例如: !cycle <@947333928417628250> channel 100 1000 ， 會讓被提及的人每1000毫秒被移動1次，直到移動了100次`);
             return;
         }
-        
+
 
         // 第一個參數，指定誰要被影響
         const userTarget = inputs[1].replaceAll(/\D/g, "");
@@ -53,9 +59,20 @@ module.exports = {
         // 第四個參數，指定要影響之間間隔幾豪秒
         const userIntervalSelect = inputs[4];
 
+        // 防止太誇張的值
+        if (userTimesSelect <= 0 || userTimesSelect > 100) {
+            message.channel.send('次數需介於1~100之間');
+            return;
+        }
+        if (userIntervalSelect < 500 || userIntervalSelect > 10000) {
+            message.channel.send("間格需大於500毫秒並小於10000毫秒");
+            return
+        }
+
 
         let cycleFunc;
         let memberObj;
+        let channels_gl;
         // 先由user的指令決定要跑哪一個function
         // 如果user打錯字, 會default為ChannelCycle()
         if (funcs[userFuncSelect] == undefined)
@@ -64,29 +81,30 @@ module.exports = {
             cycleFunc = funcs[userFuncSelect];
         }
 
-        CheckAdmin(message, db)
+        CheckAdmin(message, db, false)
             .then(() => { return CheckValidTarget(message, userTarget) })
 
             .then(user_Obj => { return memberObj = user_Obj })
 
-            .then(() => { return message.guild.channels.fetch(); })
+            .then(() => { return message.guild.channels.fetch().catch('no channel in guild'); })
 
-            .then(channels => { return channels.filter(c => c.type == 'GUILD_VOICE')  })
+            .then(channels => { return channels.filter(c => c.type == 'GUILD_VOICE') })
 
-            .then(channels => {
+            .then(channels => { channels_gl = channels; return message.channel.send('開始cycle指令'); })
+
+            .then((botMessageObj) => {
                 console.log("start cycle");
-                const channelArr = Array.from(channels)
-                
+                const channelArr = Array.from(channels_gl)
                 // cycle
                 for (let i = 0, p = Promise.resolve(); i < userTimesSelect; i++) {
-                    const channelObj = channelArr[i];
-                    p = p.then(() => cycleFunc(memberObj, userIntervalSelect, channelObj));
+                    p = p.then(() => cycleFunc(i, memberObj, userIntervalSelect, channelArr, botMessageObj));
+                    
                 }
-                
             })
 
 
             .catch((err) => {
+                message.channel.send(err);
                 console.log(err);
             })
 
@@ -94,16 +112,43 @@ module.exports = {
     }
 }
 
-function ChannelCycle(memberObj, userIntervalSelect, channelObj) {
-    return new Promise((resolve) => {
-        
+function ChannelCycle(i, memberObj, userIntervalSelect, channelArr, botMessageObj) {
 
-        setTimeout(() => { 
-            console.log(channelObj[0]);
+    const allPromiseArr = [];
+
+    let index = (i + 1) % channelArr.length;
+    const channelObj = channelArr[index];
+
+    return new Promise(resolve => {
+        setTimeout(()=>{
+            console.log(`times ${i+1}`);
             resolve();
         }, userIntervalSelect);
 
 
     })
-  
+
+    /*const p1 = new Promise((resolve)=>{
+        setTimeout(() => {
+            resolve();
+
+        }, userIntervalSelect);
+    });
+    allPromiseArr.push(p1);*/
+
+    allPromiseArr.push(new Promise((resolve, reject) => {
+        botMessageObj.edit(`第 ${i + 1} 次 cycle指令`).then(() => {
+
+        });
+    })
+    );
+
+
+
+
+    let p_all = Promise.all(allPromiseArr)
+
+    return p_all.then(() => { return Promise.resolve() });
+
+
 }
