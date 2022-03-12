@@ -120,35 +120,16 @@ function ChannelCycle(i, memberObj, userIntervalSelect, channelArr, botMessageOb
     const channelObj = channelArr[index];
 
     return new Promise(resolve => {
-        setTimeout(()=>{
-            console.log(`times ${i+1}`);
-            resolve();
-        }, userIntervalSelect);
+        botMessageObj.edit(`第 ${i + 1} 次 cycle指令`)
+        .then(()=>{
+            setTimeout(()=>{
+                console.log(`times ${i+1}`);
+                resolve();
+            }, userIntervalSelect);
+        })
+        
 
 
     })
-
-    /*const p1 = new Promise((resolve)=>{
-        setTimeout(() => {
-            resolve();
-
-        }, userIntervalSelect);
-    });
-    allPromiseArr.push(p1);*/
-
-    allPromiseArr.push(new Promise((resolve, reject) => {
-        botMessageObj.edit(`第 ${i + 1} 次 cycle指令`).then(() => {
-
-        });
-    })
-    );
-
-
-
-
-    let p_all = Promise.all(allPromiseArr)
-
-    return p_all.then(() => { return Promise.resolve() });
-
 
 }
