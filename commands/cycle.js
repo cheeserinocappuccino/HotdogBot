@@ -98,7 +98,7 @@ module.exports = {
                 // cycle
                 for (let i = 0, p = Promise.resolve(); i < userTimesSelect; i++) {
                     p = p.then(() => cycleFunc(i, memberObj, userIntervalSelect, channelArr, botMessageObj));
-                    
+
                 }
             })
 
@@ -119,15 +119,23 @@ function ChannelCycle(i, memberObj, userIntervalSelect, channelArr, botMessageOb
     let index = (i + 1) % channelArr.length;
     const channelObj = channelArr[index];
 
+    allPromiseArr.push(botMessageObj.edit(`第 ${i + 1} 次 cycle指令`));
+    const p = new Promise(res => setTimeout(res, 5000));
+    allPromiseArr.push(p);
+
     return new Promise(resolve => {
-        botMessageObj.edit(`第 ${i + 1} 次 cycle指令`)
-        .then(()=>{
-            setTimeout(()=>{
-                console.log(`times ${i+1}`);
-                resolve();
-            }, userIntervalSelect);
-        })
-        
+
+
+
+        const p_all = Promise.all(allPromiseArr);
+        p_all
+            .then(() => {
+                setTimeout(() => {
+                    console.log(`times ${i + 1}`);
+                    resolve();
+                }, userIntervalSelect);
+            })
+
 
 
     })
