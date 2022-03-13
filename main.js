@@ -10,7 +10,8 @@ const client = new Discord.Client({ intents: ["GUILDS", "GUILD_MESSAGES", "GUILD
 
 // tasksHandles是執行特定任務時需要暫時被關閉的功能
 const tasksHandles = {
-    "GuildMemberUpdate": GuildMemberUpdates
+    "GuildMemberUpdate": GuildMemberUpdates,
+    "ChangePrefix": ChangePrefix
 }
 
 
@@ -80,6 +81,8 @@ client.on('voiceStateUpdate', (oldState, newState) => {
         return;
     }
 
+    
+
 
     // 暫時關閉GuildMemberUpdates (使function內容為空)
     let originGMU = function () { };
@@ -88,25 +91,15 @@ client.on('voiceStateUpdate', (oldState, newState) => {
         tasksHandles['GuildMemberUpdate'] = function () { };
     }
 
-
-
-
-
-    // 用來暫放GetNameForChangedStateUser的回傳
-    let gl_OriginName;
-    // 檢查是否為第一次進入任一語音頻道，若有，儲存被bot修改前的本名，若無則繼續
-    FirstInVoiceChannel(oldState, newState)
-        .then(() => { return GetNameForChangedStateUser(oldState, newState) })// 接著，先從DB拿回本名
-        .then(originName => { gl_OriginName = originName; console.log('ch originName'); return newState.member.setNickname(originName, "backtonormal"); }) // 利用上一句的回傳(origiName)，將user先設定為本名，若為退出頻道，只會運行到這句，下一句收到會直接return
-        .then(guildMember => { return GetPrefixPlusUsername(oldState, newState, gl_OriginName) }) // 找到該語音群的prefix，傳給下一句
-        .then(newName => { console.log('ch prefix'); return newState.member.setNickname(newName, "enter prefixed channel") }) // 實際更改username
-        .then(() => {
-            if (originGMU.toString().length > 20)
-            tasksHandles['GuildMemberUpdate'] = originGMU;
-            console.log("Finished change nickname");
-            return;
-        }) // 事情結束，將GuildMemberUpdates恢復原狀
-        .catch(err => {console.log(err + " --rejected from VoiceStateUpdate"); return;}) // resolve上面任何一串的reject
+    if(tasksHandles['ChangePrefix'].toString().length > 30)
+    {
+        tasksHandles['ChangePrefix'](oldState, newState, originGMU);
+    }
+    else
+    {
+        return;
+    }
+        
 
 });
 
@@ -234,6 +227,24 @@ function GetPrefixPlusUsername(oldState, newState, originName) {
     })
 }
 
+function ChangePrefix(oldState, newState, originGMU)
+{
+    // 用來暫放GetNameForChangedStateUser的回傳
+    let gl_OriginName;
+    // 檢查是否為第一次進入任一語音頻道，若有，儲存被bot修改前的本名，若無則繼續
+    FirstInVoiceChannel(oldState, newState)
+        .then(() => { return GetNameForChangedStateUser(oldState, newState) })// 接著，先從DB拿回本名
+        .then(originName => { gl_OriginName = originName; console.log('ch originName'); return newState.member.setNickname(originName, "backtonormal"); }) // 利用上一句的回傳(origiName)，將user先設定為本名，若為退出頻道，只會運行到這句，下一句收到會直接return
+        .then(guildMember => { return GetPrefixPlusUsername(oldState, newState, gl_OriginName) }) // 找到該語音群的prefix，傳給下一句
+        .then(newName => { console.log('ch prefix'); return newState.member.setNickname(newName, "enter prefixed channel") }) // 實際更改username
+        .then(() => {
+            if (originGMU.toString().length > 20)
+            tasksHandles['GuildMemberUpdate'] = originGMU;
+            console.log("Finished change nickname");
+            return;
+        }) // 事情結束，將GuildMemberUpdates恢復原狀
+        .catch(err => {console.log(err + " --rejected from VoiceStateUpdate"); return;}) // resolve上面任何一串的reject
+}
 
 
 // login, keep this at the bottom of main()

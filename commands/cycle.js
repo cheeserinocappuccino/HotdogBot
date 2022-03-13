@@ -64,11 +64,14 @@ module.exports = {
             message.channel.send('次數需介於1~100之間');
             return;
         }
-        if (userIntervalSelect < 300 || userIntervalSelect > 10000) {
-            message.channel.send("間格需大於300毫秒並小於10000毫秒");
+        if (userIntervalSelect < 500 || userIntervalSelect > 10000) {
+            message.channel.send("間格需大於500毫秒並小於10000毫秒");
             return
         }
 
+        // 關閉ChangePrefix的功能，避免他影響切換頻道的速度
+        const originFunc = tasksHandles['ChangePrefix']; //GuildMemberUpdates
+        tasksHandles['ChangePrefix'] = function () { };
 
         let cycleFunc;
         let memberObj;
@@ -97,39 +100,55 @@ module.exports = {
                 const channelArr = Array.from(channels_gl)
                 // cycle
                 for (let i = 0, p = Promise.resolve(); i < userTimesSelect; i++) {
-                    p = p.then(() => cycleFunc(i, userTimesSelect, memberObj, userIntervalSelect, channelArr, botMessageObj));
+                    p = p.then(() => cycleFunc(i, userTimesSelect, memberObj, userIntervalSelect, channelArr, botMessageObj, tasksHandles, originFunc));
+
                 }
             })
 
 
             .catch((err) => {
                 message.channel.send(err);
+                tasksHandles['ChangePrefix'] = originFunc;
                 console.log(err);
+                return;
             })
 
 
     }
 }
 
-function ChannelCycle(i,userTimesSelect , memberObj, userIntervalSelect, channelArr, botMessageObj) {
+function ChannelCycle(i,userTimesSelect , memberObj, userIntervalSelect, channelArr, botMessageObj,tasksHandles,originFunc) {
+
+    let botmsg = `第 ${i + 1} 次 cycle指令`;
+    if(i == userTimesSelect - 1)
+    {
+        botmsg = `cycle指令結束，運行了${i+1}次`
+        tasksHandles['ChangePrefix'] = originFunc;
+    }
 
     const allPromiseArr = [];
 
     let index = (i + 1) % channelArr.length;
     const channelObj = channelArr[index];
 
-    let botmsg = `第 ${i + 1} 次 cycle指令`;
-    if((i+1) == userTimesSelect)
-        botmsg = `cycle指令結束，運行了${i+1}次`
-        
-    allPromiseArr.push(botMessageObj.edit(botmsg));
-    
-    const p = memberObj.voice.setChannel(channelObj[0]);
-    allPromiseArr.push(p);
 
-    const delay = new Promise(res => setTimeout(res, userIntervalSelect));
+    if(memberObj.voice.channelId != undefined)
+    {
+        allPromiseArr.push(memberObj.voice.setChannel(channelObj[0]).catch(()=>botmsg = `(p)目標已不在任一語音群，第${i+1} 次為空轉`));
+    }
+    else{
+        botmsg = `目標已不在任一語音群，第${i+1} 次為空轉`;
+    }
+
+    
+    allPromiseArr.push(new Promise(res => setTimeout(res, userIntervalSelect)));
+
+    allPromiseArr.push(botMessageObj.edit(botmsg));
 
     const p_all = Promise.all(allPromiseArr);
+
+
+
     return p_all;
 
 
