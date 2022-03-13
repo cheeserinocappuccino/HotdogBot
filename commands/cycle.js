@@ -64,8 +64,8 @@ module.exports = {
             message.channel.send('次數需介於1~100之間');
             return;
         }
-        if (userIntervalSelect < 500 || userIntervalSelect > 10000) {
-            message.channel.send("間格需大於500毫秒並小於10000毫秒");
+        if (userIntervalSelect < 300 || userIntervalSelect > 10000) {
+            message.channel.send("間格需大於300毫秒並小於10000毫秒");
             return
         }
 
@@ -97,8 +97,7 @@ module.exports = {
                 const channelArr = Array.from(channels_gl)
                 // cycle
                 for (let i = 0, p = Promise.resolve(); i < userTimesSelect; i++) {
-                    p = p.then(() => cycleFunc(i, memberObj, userIntervalSelect, channelArr, botMessageObj));
-
+                    p = p.then(() => cycleFunc(i, userTimesSelect, memberObj, userIntervalSelect, channelArr, botMessageObj));
                 }
             })
 
@@ -112,32 +111,26 @@ module.exports = {
     }
 }
 
-function ChannelCycle(i, memberObj, userIntervalSelect, channelArr, botMessageObj) {
+function ChannelCycle(i,userTimesSelect , memberObj, userIntervalSelect, channelArr, botMessageObj) {
 
     const allPromiseArr = [];
 
     let index = (i + 1) % channelArr.length;
     const channelObj = channelArr[index];
 
-    allPromiseArr.push(botMessageObj.edit(`第 ${i + 1} 次 cycle指令`));
-    const p = new Promise(res => setTimeout(res, 5000));
+    let botmsg = `第 ${i + 1} 次 cycle指令`;
+    if((i+1) == userTimesSelect)
+        botmsg = `cycle指令結束，運行了${i+1}次`
+        
+    allPromiseArr.push(botMessageObj.edit(botmsg));
+    
+    const p = memberObj.voice.setChannel(channelObj[0]);
     allPromiseArr.push(p);
 
-    return new Promise(resolve => {
+    const delay = new Promise(res => setTimeout(res, userIntervalSelect));
 
+    const p_all = Promise.all(allPromiseArr);
+    return p_all;
 
-
-        const p_all = Promise.all(allPromiseArr);
-        p_all
-            .then(() => {
-                setTimeout(() => {
-                    console.log(`times ${i + 1}`);
-                    resolve();
-                }, userIntervalSelect);
-            })
-
-
-
-    })
 
 }
