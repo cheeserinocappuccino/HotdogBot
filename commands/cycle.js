@@ -60,12 +60,12 @@ module.exports = {
         const userIntervalSelect = inputs[4];
 
         // 防止太誇張的值
-        if (userTimesSelect <= 0 || userTimesSelect > 100) {
+        if (userTimesSelect <= 0 || userTimesSelect > 10000) {
             message.channel.send('次數需介於1~100之間');
             return;
         }
-        if (userIntervalSelect < 500 || userIntervalSelect > 10000) {
-            message.channel.send("間格需大於500毫秒並小於10000毫秒");
+        if (userIntervalSelect < 100 || userIntervalSelect > 10000) {
+            message.channel.send("間格需大於100毫秒並小於10000毫秒");
             return
         }
 
