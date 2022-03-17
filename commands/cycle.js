@@ -119,7 +119,7 @@ module.exports = {
 
 function ChannelCycle(i,userTimesSelect , memberObj, userIntervalSelect, channelArr, botMessageObj,tasksHandles,originFunc) {
 
-    let botmsg = `第 ${i + 1} 次 cycle指令`;
+    let botmsg = `第 ${i + 1} 次 cycle指令，還剩下 ${userTimesSelect - (i+1)} 次`;
     if(i == userTimesSelect - 1)
     {
         botmsg = `cycle指令結束，運行了${i+1}次`
